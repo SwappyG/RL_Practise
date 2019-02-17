@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from Gridworld import Gridworld
 		
-class Agent:
+class GridAgent:
 	
 	UP = 0
 	DOWN = 1
@@ -71,18 +71,18 @@ class Agent:
 	# Update Q based on R, future R and curr Q
 	def _get_Q_update(self, S, A, S_next, A_next, R, method=None):
 		
-		if method==None: method=Agent.SARSA
+		if method==None: method=GridAgent.SARSA
 		
 		this_Q = self.Q[ S[0], S[1], A ]
 		
-		if method == Agent.SARSA:
+		if method == GridAgent.SARSA:
 			next_Q = self.Q[ S_next[0], S_next[1], A_next ]
 			
-		elif method == Agent.Q_LEARNING:
+		elif method == GridAgent.Q_LEARNING:
 			best_A = self._get_action(S_next, train=False)
 			next_Q = self.Q[ S_next[0], S_next[1], best_A ]
 			
-		elif method == Agent.EXPECTED_SARSA:
+		elif method == GridAgent.EXPECTED_SARSA:
 			next_Q = self._get_weighted_Q(S_next)
 				
 		# exponentially decaying average of all Q vals for this state
@@ -101,35 +101,35 @@ class Agent:
 		else:
 			mod = 0
 	
-		if A == Agent.UP:
+		if A == GridAgent.UP:
 			v = self._clip( S[0] - 1 + world.wind[S[1]] + mod, 0, world.H - 1 )
 			h = S[1]
 			
-		elif A == Agent.DOWN:
+		elif A == GridAgent.DOWN:
 			v = self._clip( S[0] + 1 + world.wind[S[1]] + mod, 0, world.H - 1 )
 			h = S[1]
 			
-		elif A == Agent.LEFT:
+		elif A == GridAgent.LEFT:
 			v = self._clip( S[0]     + world.wind[S[1]] + mod, 0, world.H - 1 )
 			h = self._clip( S[1] - 1			   				, 0, world.W - 1 )
 			
-		elif A == Agent.RIGHT:
+		elif A == GridAgent.RIGHT:
 			v = self._clip( S[0] 	+ world.wind[S[1]] + mod, 0, world.H - 1 )
 			h = self._clip( S[1] + 1			   				, 0, world.W - 1 )
 			
-		elif A == Agent.UP_LEFT:
+		elif A == GridAgent.UP_LEFT:
 			v = self._clip( S[0] - 1 + world.wind[S[1]] + mod, 0, world.H - 1 )
 			h = self._clip( S[1] - 1			   				, 0, world.W - 1 )
 			
-		elif A == Agent.UP_RIGHT:
+		elif A == GridAgent.UP_RIGHT:
 			v = self._clip( S[0] - 1 + world.wind[S[1]] + mod, 0, world.H - 1 )
 			h = self._clip( S[1] + 1			   				, 0, world.W - 1 )
 		
-		elif A == Agent.DOWN_LEFT:
+		elif A == GridAgent.DOWN_LEFT:
 			v = self._clip( S[0] + 1 + world.wind[S[1]] + mod, 0, world.H - 1 )
 			h = self._clip( S[1] - 1	 		   				, 0, world.W - 1 )
 			
-		elif A == Agent.DOWN_RIGHT:
+		elif A == GridAgent.DOWN_RIGHT:
 			v = self._clip( S[0] + 1 + world.wind[S[1]] + mod, 0, world.H - 1 )
 			h = self._clip( S[1] + 1			   				, 0, world.W - 1 )
 			
@@ -179,7 +179,7 @@ class Agent:
 	# Runs a single episode in the provided world
 	def run_episode(self, world, move_timeout=1000, train=True, print_moves=100, method=None):
 	
-		if method==None: method = Agent.SARSA
+		if method==None: method = GridAgent.SARSA
 	
 		moves = 1		# moves made this episode
 		G = 0			# total returns of episode
@@ -189,7 +189,7 @@ class Agent:
 		A = self._get_action(S, train=train)
 		path.append(S)	# Append the starting state		
 		
-		while S != world.end_pos: # While not at end pos
+		while not (S in world.end_pos): # While not at end pos
 						
 			S_next 	= self._get_next_state(S, A, world) 	# marker for next state
 			R 		= world.get_reward(S_next, timeout=(moves>move_timeout))  # Reward of this (S,A) transition
@@ -222,7 +222,7 @@ class Agent:
 	# Trains the episode by running specified episodes and occasionally printing to console
 	def train_agent(self, world, episodes=100, move_timeout=1000, print_moves=100, ramp_alpha=False, method=None):
 		
-		if method==None: method = Agent.SARSA
+		if method==None: method = GridAgent.SARSA
 			
 		best_G = -move_timeout
 		for episode in range(episodes):
@@ -250,21 +250,21 @@ class Agent:
 		if (h,w) == start:
 			return "SS"
 
-		if num == Agent.UP:
+		if num == GridAgent.UP:
 			return "^^"
-		if num == Agent.DOWN: 
+		if num == GridAgent.DOWN: 
 			return "VV"
-		if num == Agent.LEFT:
+		if num == GridAgent.LEFT:
 			return "<-"
-		if num == Agent.RIGHT:
+		if num == GridAgent.RIGHT:
 			return "->"
-		if num == Agent.UP_LEFT:
+		if num == GridAgent.UP_LEFT:
 			return "|-"
-		if num == Agent.UP_RIGHT:
+		if num == GridAgent.UP_RIGHT:
 			return "-|"
-		if num == Agent.DOWN_LEFT:
+		if num == GridAgent.DOWN_LEFT:
 			return "|_"
-		if num == Agent.DOWN_RIGHT:
+		if num == GridAgent.DOWN_RIGHT:
 			return "_|"
 	
 	# Returns a visualization of the policy (chars or nums)

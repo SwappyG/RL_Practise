@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from Gridworld import Gridworld
-from Agent import Agent
+from GridAgent import GridAgent
 
 # Constants
 UP = 0
@@ -54,7 +54,7 @@ def main():
 							"actions": ACTIONS 			}
 	
 	windy_world = Gridworld(**windy_world_args)
-	windy_agent = Agent(START_POS, windy_world.H, windy_world.W, NUM_A, **windy_agent_args)
+	windy_agent = GridAgent(START_POS, windy_world.H, windy_world.W, NUM_A, **windy_agent_args)
 	# windy_agent.set_Q_to_default()
 	
 	print(f"Training agent for {TRAIN_EPS} episodes")
@@ -64,7 +64,7 @@ def main():
 	print(f"Checking path and returns for trained agent")
 	G, path = windy_agent.run_episode(windy_world, train=False)
 	
-	print(f"Agent completed task in {-G} moves\n")
+	print(f"GridAgent completed task in {-G} moves\n")
 	policy = windy_agent.get_policy(world=windy_world, visual=True)
 	for a in policy:
 		print(a)

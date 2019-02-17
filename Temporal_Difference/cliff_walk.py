@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from Gridworld import Gridworld
-from Agent import Agent
+from GridAgent import GridAgent
 
 # Constants
 UP = 0
@@ -69,7 +69,7 @@ def main():
 	
 	# Create the world and agent
 	cliff_world = Gridworld(**cliff_world_args)
-	cliff_agent = Agent(START_POS, cliff_world.H, cliff_world.W, NUM_A, **cliff_agent_args)
+	cliff_agent = GridAgent(START_POS, cliff_world.H, cliff_world.W, NUM_A, **cliff_agent_args)
 	
 	# Train the agent for specified eps, occasionally printing to console
 	print(f"Training agent for {TRAIN_EPS} episodes")
@@ -79,16 +79,15 @@ def main():
 		move_timeout=1000, 
 		episodes=5000,
 		ramp_alpha=True, 
-		method=Agent.Q_LEARNING
+		method=GridAgent.Q_LEARNING
 	)
 		
 	# Check the final policy (no training, acting 100% greedily)
 	print(f"\nDone training agent for {TRAIN_EPS} episodes")
 	print(f"Checking path and returns for trained agent")
-	cliff_agent.Q = cliff_agent.best_Q
 	G, path = cliff_agent.run_episode(cliff_world, train=False)
 	
-	print(f"Agent received reward {-G} (smaller is better)\n")
+	print(f"GridAgent received reward {-G} (smaller is better)\n")
 	
 	# Visualize the final policy
 	policy = cliff_agent.get_policy(world=cliff_world, visual=True)
