@@ -19,6 +19,9 @@ class World(object):
     def GetNextState(self, S, A):
         raise NotImplementedError(f'{sys._getframe().f_code.co_name} must be implemented by derived class of class: {self.__class__.__name__}')
 
+    def IsTerminal(self, S):
+        raise NotImplementedError(f'{sys._getframe().f_code.co_name} must be implemented by derived class of class: {self.__class__.__name__}')
+
 """
 Implements the World class.
 Defines an Ndim World (discrete) with a start state and goal state
@@ -97,7 +100,8 @@ class DynamicNDWorld(World):
         else:
             return DynamicNDWorld.NORMAL_REWARD
 
-
+    def IsTerminal(self, S):
+        return S == self.goal_state
 
 
 if __name__=="__main__":

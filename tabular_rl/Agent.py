@@ -6,17 +6,32 @@ class Agent(object):
 		self.training = kwargs.get("training", True)
         self.curr_state = start_state
 
+    # Use our policy to get the action
 	def GetAction(self, S):
 		return policy.GetAction(S)
 
 	def ImprovePolicy(self, exp_packet):
+
+        # Only improve policy if training flag is set
 		if self.training:
+
+            # Grab elements out of our exp_packet
 			S_list, A_list, R_list, n = exp_packet.Get()
+
+            # grab the current value of the state
 			V = self.policy.vals[S_list[0], A_list[0]]
+
+            # Calculate the new target based on the exp_packet
 			G = self.policy.GetTargetEstimate(exp_packet)
+
+            # Increment towards the new target based on learning rate
             new_val = (1-self.alpha) * V + self.alpha * G
+
+            # Update the value of the state and return True
 			self.policy.UpdateState(S_list[0], A_list[0], new_val)
 			return True
+
+        # Training flag not set, return false
         else:
 			return False
 
