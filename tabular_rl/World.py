@@ -3,116 +3,91 @@
 import sys
 import numpy as np
 
+"""
+Holds a WorldSpace instance defining the valid states and actions
+Returns reward given state, and next state given state and action
+This is a template class that must be implemented by a child class
+"""
 class World(object):
 
-    def __init__(self, state_space, action_space):
-        self.S = state_space
-        self.A = action_space
+    def __init__(self, world_space):
+        self.world_space = world_space
 
     def GetReward(self, S):
         raise NotImplementedError(f"{sys._getframe().f_code.co_name} must be implemented by derived class of class: {self.__class__.__name__}")
 
-    def GetAllStates(self):
-        return self.S
-
-    def GetAllActions(self):
-        return self.A
-
     def GetNextState(self, S, A):
         raise NotImplementedError(f'{sys._getframe().f_code.co_name} must be implemented by derived class of class: {self.__class__.__name__}')
 
-
-class Coord(object):
-    def __init__(self, x=0, y=0, **lims):
-        self.x = x
-        self.y = y
-        self.x_min = lims.get('x_min', None)
-        self.x_max = lims.get('x_max', None)
-        self.y_min = lims.get('y_min', None)
-        self.y_max = lims.get('y_max', None)
-
-    def _Clip(self, val, min, max):
-        return np.maximum( np.minimum(val, max) , min)
-
-    def Up(self, val=1):
-        self.y = self._Clip(self.y+val, self.y_min, self.y_max)
-
-    def Down(self, val=1):
-        self.y = self._Clip(self.y-val, self.y_min, self.y_max)
-
-    def Right(self, val=1):
-        self.y = self._Clip(self.x+val, self.x_min, self.x_max)
-
-    def Left(self, val=1):
-        self.y = self._Clip(self.x-val, self.x_min, self.x_max)
-
-    def Get(self):
-        return (self.x, self.y)
-
+"""
+Implements the World class.
+Defines an Ndim World (discrete) with a start state and goal state
+Optional dynamics, hazard and noise functions can also be defined
+State transitions occur by adding an action (from world_space) to state
+Additional motion is achieved via dynamics, hazard and noise functions
+"""
 class DynamicNDWorld(World):
-
-    NORMAL_STATE = 0
-    START_STATE = 1
-    GOAL_STATE = 2
-    HAZARD_STATE = 3
 
     NORMAL_REWARD = -1
     OUT_OF_BOUND_REWARD = -50
     HAZARD_REWARD = -50
     GOAL_REWARD = -1
 
-    def __init__(self, max_coords, move_dict, **kwargs):
-        World.__init__(self, max_coords, move_dict)
+    def __init__(self, world_space, **kwargs):
+        World.__init__(self, world_space)
 
-        state_space = np.ones(shape=max_coords, dtype=np.int32) * DynamicNDWorld.NORMAL_STATE
-        self._zero_state = np.array( [0 for _ in max_coords] )
-        self._no_move = np.array( [0 for _ in max_coords] )
-        self._final_state = np.array( [coord-1 for coord in max_coords] )
-        self._num_dims = len(max_coords)
+        # creates a [0,0,..,0] array, len of dims in state
+        self._no_move = np.array( [0 for _ in self.world_space.GetSDims()] )
 
-        self.start_state  =  kwargs.get( 'start_pos', self._zero_state )
-        self.goal_state   =  kwargs.get( 'goal_pos', self._final_state )
+        # Stores the start and goal states if specified, otherwise use zero/last
+        self.start_state  =  kwargs.get( 'start_pos', self.world_space.ZeroState() )
+        self.goal_state   =  kwargs.get( 'goal_pos', self.world_space.LastState() )
+
+        # Stores func handles if specified, otherwise store default lambdas
         self.hazard_func  =  kwargs.get( 'hazard_func', lambda *_: False )
-        self.dynamics_func    =  kwargs.get( 'dynamics_func', lambda *_: self._no_move )
+        self.dynamics_func =  kwargs.get( 'dynamics_func', lambda *_: self._no_move )
         self.noise_func    =  kwargs.get( 'noise_func', lambda *_: self._no_move )
 
-        try:
-            state_space[self.start_state] = DynamicNDWorld.START_STATE
-            state_space[self.goal_state] = DynamicNDWorld.GOAL_STATE
-        except IndexError as err:
-            print f"start, goal and hazard pos must all be within state_space, got exception: {err}"
+        # Make sure specified star and goal is valid
+        if not self.world_space.IsValidState(self.start_state) or
+            not self.world_space.IsValidState(self.goal_state):
+            print f"start, start and goal must all be within world_space.\nS: {self.world_space.GetSDims()}\nGot the following...\nstart: {self.start_state}\ngoal: {self.goal_state}"
 
-
-    def _Clip(self, val, min, max):
-        return np.maximum( np.minimum(val, max) , min)
-
-    def _IsOutOfBound(self, S):
-        return np.any(S > self._final_state) or np.any(S < self._zero_state)
-
+    # Returns the next state
+    # param: S - indices for each dim as np.array
+    # param: A - index of action
     def GetNextState(self, S, A):
 
         # Grab the move for the given action from the move dict
-        move = self.A[A]
+        move = self.world_space.ActionVal(index=A)
         S = S + move
 
-        if self._IsOutOfBound(S):
+        # If we moved out of bounds, set flag, return to start_state
+        if not self.world_space.IsValidState(S):
             self.out_of_bounds = True
             return self.start_state
 
+        # Apply dynamics and noise from new state
         S = S + self.dynamics_func(S) + self.noise_func(S)
-        if self._IsOutOfBound(S):
+
+        # If we moved out of bounds, set flag, return to start_state
+        if not self.world_space.IsValidState(S):
             self.out_of_bounds = True
             return self.start_state
 
+        # Set flag if in hazard and move to start
         if self.hazard_func(S):
             self.hit_hazard = True
             return self.start_state
 
+        # clear flags if we hit nothing, return the state
         self.hit_hazard = False
         self.out_of_bounds = False
         return S
 
+    # Returns reward corresponding to latest (S,A) pair
     def GetReward(self, S):
+        # return appropriate reward based on flags set during GetNextState
         if self.out_of_bounds:
             return DynamicNDWorld.OUT_OF_BOUND_REWARD
         elif self.hit_hazard:
