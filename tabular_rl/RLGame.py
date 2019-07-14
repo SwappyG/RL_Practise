@@ -5,26 +5,31 @@ class RLGame(object):
 
     def RunEpisode(self):
 
-        A = []
-        S = [agent.curr_state]
-        R = []
-        n = 1
+        agent_hists = []
+        for agent in self.agents:
+            agent_hist.push_back( ExpPacket([], [agent.curr_state], [], 1) )
 
-        for agent in agents:
-            while not self._IsTerminal(agent):
-                A.push_back( agent.GetAction( S[-1] ) )
-                S.push_back( world.GetNextState( S[-1] , A[-1] ) )
-                R.push_back( world.GetReward( S[-1] ) )
-
-                if len(A) > n+1 and len(R) > n+1 and len(S) > n+1:
-                    packet = ExpPacket(S[-2:], A[-2], R[-1], n)
-
-                new_val = agent.ImprovePolicy(packet)
-                agent.UpdateCurrentState( S[-1] )
-
-                del packet
+        for ii in range(len(self.agents)):
+            while not self._IsTerminal(self.agents[ii]):
+                self.StepAgent(self.agents[ii], agent_hists[ii])
 
         return ExpPacket(S, A, R, n)
+
+    def StepAgent(self, agent, agent_hist):
+        A = agent.GetAction( S[-1] )
+        S = world.GetNextState( S[-1] , A[-1] )
+        R = world.GetReward( S[-1] )
+
+        agent_hist.Push(S, A, R)
+
+        if agent_hist.Trainable():
+            S, A, R, _ = agent_hist.Get()
+            packet = ExpPacket(S[-2:], A[-2], R[-1], n)
+
+        new_val = agent.ImprovePolicy(packet)
+        agent.UpdateCurrentState( S[-1] )
+
+        del packet
 
     def TrainAgent(self, id, episodes):
         pass

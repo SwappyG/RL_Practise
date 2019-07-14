@@ -8,25 +8,17 @@ class Policy(object):
 	STATE_VALUES = 0
 	ACTION_STATE_VALUES = 1
 
-	def __init__(self, world, **kwargs):
+	def __init__(self, world_space, **kwargs):
 
 		self.world_space = 	world_space
-		self.gamma = 		kwargs.get("discount_factor", 1)
-		self.epsilon = 		kwargs.get("exploration_factor", 0.95)
-		self.is_static = 	kwargs.get("static", True)
+		self.gamma = 		kwargs.get("discount_factor")
+		self.epsilon = 		kwargs.get("exploration_factor")
+		self.is_static = 	kwargs.get("is_static")
 		self.type = 		kwargs.get("value_type", Policy.STATE_VALUES)
-		self.init_var = 	kwargs.get("init_variance", 0.01)
 		self.known_vals =   kwargs.get("known_state_vals", [])
 
 		self._s_dim = self.world_space.GetSDims()
 		self._num_a = self.world_space.GetNumA()
-
-		if self.type == Policy.STATE_VALUES:
-			self.vals = np.random.normal(loc=0, scale=self.init_var, shape=self._s_dim)
-		elif self.type == Policy.ACTION_STATE_VALUES:
-			self.vals = np.random.normal(loc=0, scale=self.init_var, np.append(s_dim, self._num_a) )
-		else:
-			raise ValueError("kwarg value_type is invalid")
 
 
 
@@ -39,74 +31,149 @@ class Policy(object):
 	def GetTargetEstimate(self, packet, n_step=None):
 		raise NotImplementedError(f'{sys._getframe().f_code.co_name} must be implemented by derived class of class: {self.__class__.__name__}')
 
-	# def IsValidState(self, S):
-	# 	return self.world.IsValidState(S)
-	#
-	# def IsValidAction(self, A):
-	# 	return self.world.IsValidAction(A)
-	#
-	# def IsValidStateAction(self, S, A):
-	# 	return self.world.IsValidStateAction(S, A)
+	def GetStateVal(self, S):
+		raise NotImplementedError(f'{sys._getframe().f_code.co_name} must be implemented by derived class of class: {self.__class__.__name__}')
 
-class SarsaPolicy(Policy):
+	def IsValidState(self, S):
+		return self.world_space.IsValidState(S)
 
-	def __init__(self, world, **kwargs):
-		params = {}
-		params["discount_factor"] = kwargs.get("discount_factor", 1)
-		params["exploration_factor"] = kwargs.get("exploration_factor", 0.95)
-		params["static"] = kwargs.get("static", False)
-		params["value_type"] = Policy.ACTION_STATE_VALUES
-		Policy.__init__(self, world, params)
+	def IsValidAction(self, A):
+		return self.world_space.IsValidAction(A)
 
-	# Returns a selection of equally valid actions
-	def _GetActions(self, S, eps=1):
+	def IsValidStateAction(self, S ,A):
+		return self.IsValidState(S) and self.IsValidAction(A)
 
-		# occasionally select a random action
-		if (np.random.rand() < eps):
-			selection = range(self._num_a)
+class TabularPolicy(Policy):
 
-		# get a set of actions tied for the max value for this state
+	def __init__(self, world_space, **kwargs):
+		self.init_var = kwargs.get("init_variance")
+		Policy.__init__(self, world_space, **kwargs)
+
+		if self.type == Policy.STATE_VALUES:
+			self.vals = np.random.normal(loc=0, scale=self.init_var, size=self._s_dim)
+		elif self.type == Policy.ACTION_STATE_VALUES:
+			self.vals = np.random.normal(loc=0, scale=self.init_var, size=np.append(self._s_dim, self._num_a) )
 		else:
-			vals = self.vals[S, :]
-			selection = [index for index, val in enumerate(vals) if v == np.max(vals)]
+			raise ValueError("kwarg value_type is invalid")
 
-		return selection
-
-	# Picks a random action from a selection
-	def GetAction(self, S):
-		# Grab a selection of equal valued actions
-		selection = self._GetActions(S, eps=self.epsilon)
-
-		# Pick randomly from our selection and return
-		return np.random.choice(selection)
-
-	# Returns the estimated value of (S[0],A[0]) pair based on exp in packet
-	def GetTargetEstimate(self, packet):
-		S_list, A_list, R_list, n = packet.Get()
+	def IsValidState(self, S):
+		# Check if every element in S is a whole number
 		try:
-			next_val = self.vals[ S_list[1], A_list[1] ]
-		except IndexError as e:
-			print(f"Bad ExpPacket sent to GetTargetEstimate. S_list and A_list must be at least length 2, their values must be valid a valid S,A pair. \nGot S: {S_list},\nA: {A_list}")
-			raise IndexError
-		return R[0] + self.gamma*next_val
+			if not np.all( [isinstance(s, (int,long)) for s in S ] ):
+				return False
 
-	def GetProbabilityOfAction(self, S, A):
-		# Get the probability of selecting A by exploring, P(A|S,exploit) = eps/num_a
-		prob_exploration = (1-self.epsilon)/self._num_a
+		# Catch TypeError incase S is not a list (single dimension)
+		except TypeError:
+			pass
 
-		# Get the probability of selecting A by exploiting, P(A,not_best|S,explore) = 0
-		selection = self._GetActions(S,eps=1)
-		if A in selection:
-			prob_exploitation = self.epsilon / len(selection)
-			return prob_exploration + prob_exploitation
-		else:
-			return prob_exploration
+		# Let the world_space determine validity if we have all ints/longs
+		return self.world_space.IsValidState(S)
 
-	# Updates value of state in policy as given
-	def UpdateState(self, S, A, val):
-		if self.IsValidStateAction(S, A):
-			self.vals[S, A] = val
-			return True
-		else:
-			print f"Invalid (S, A) pair, got S: {S} and A: {A}"
-			return False
+	def GetStateVal(self, indices):
+		return self.vals[tuple(indices)]
+
+	def UpdateStateVal(self, indices, val):
+		# print self.vals[tuple(indices)]
+		self.vals[tuple(indices)] = val
+		# print self.vals
+
+
+if __name__=="__main__":
+
+	import unittest
+	from collections import OrderedDict
+	from WorldSpace import WorldSpace
+	from ExpPacket import ExpPacket
+
+	class TestPolicy(unittest.TestCase):
+
+		def setUp(self):
+			self.ss = (7,9)
+
+			self.a_map = OrderedDict()
+			self.a_map['U'] = (1,1)
+			self.a_map['D'] = (-1,-1)
+			self.a_map['R'] = (1,0)
+			self.a_map['L'] = (1,-2)
+
+			self.ws = WorldSpace(self.ss, self.a_map)
+
+			self.p_kw = {}
+			self.p_kw['discount_factor'] = 1
+			self.p_kw['exploration_factor'] = 0.95
+			self.p_kw['is_static'] = False
+
+			self.policy = Policy(self.ws, **self.p_kw)
+
+		# Test if IsValidState, IsValidAction and IsValidStateAction are good
+		def test_Init(self):
+			self.assertTrue(self.policy.IsValidState((0,0)))
+			self.assertTrue(self.policy.IsValidState((0,1)))
+			self.assertTrue(self.policy.IsValidState((1,0)))
+			self.assertTrue(self.policy.IsValidState((1.4356534,4.3)))
+			self.assertFalse(self.policy.IsValidState((-1.4356534,4.3)))
+			self.assertFalse(self.policy.IsValidState((7,9)))
+			self.assertFalse(self.policy.IsValidState((0, -1)))
+
+			self.assertTrue(self.policy.IsValidAction(0))
+			self.assertFalse(self.policy.IsValidAction(5))
+			self.assertFalse(self.policy.IsValidAction(-1))
+			with self.assertRaises(TypeError):
+				self.policy.IsValidAction(1.2)
+
+			s = self.policy.IsValidState((0,0))
+			a = self.policy.IsValidAction(0)
+			s_a = self.policy.IsValidStateAction((0,0), 0)
+			self.assertEqual( s_a, s and a )
+
+			s = self.policy.IsValidState((1,5))
+			a = self.policy.IsValidAction(7)
+			s_a = self.policy.IsValidStateAction((1,5), 7)
+			self.assertEqual( s_a, s and a )
+
+			s = self.policy.IsValidState((-1,5))
+			a = self.policy.IsValidAction(7)
+			s_a = self.policy.IsValidStateAction((-1,5), 2 )
+			self.assertEqual( s_a, s and a )
+
+		# Raise NotImplementedError for rest of functions
+		def test_NotImplementedGetAction(self):
+			with self.assertRaises(NotImplementedError):
+				self.policy.GetAction((0,0))
+			with self.assertRaises(NotImplementedError):
+				self.policy.GetAction((-1, 3, 67, 7.4))
+
+		def test_NotImplementedGetProbabilityOfAction(self):
+			with self.assertRaises(NotImplementedError):
+				self.policy.GetProbabilityOfAction(55)
+			with self.assertRaises(NotImplementedError):
+				self.policy.GetProbabilityOfAction(0.5)
+
+		def test_NotImplementedGetTargetEstimate(self):
+			with self.assertRaises(NotImplementedError):
+				self.policy.GetTargetEstimate( ExpPacket([], [], [], 1) )
+			with self.assertRaises(NotImplementedError):
+				self.policy.GetTargetEstimate( ExpPacket([(0,0),(3,1),(8,1)], [0,2,1], [-1,-1,0], 1) )
+
+		# Test that the TabularPolicy enforces discrete states and creates a value matrix for the state_space
+		def test_TabularPolicy(self):
+			self.p_kw['value_type'] = Policy.STATE_VALUES
+			self.p_kw['init_variance'] = 0.01
+			self.tab_pol = TabularPolicy(self.ws, **self.p_kw)
+			self.assertTrue( np.all(self.tab_pol.vals.shape == self.ss) )
+
+			self.assertTrue( self.tab_pol.IsValidState((0,0)) )
+			self.assertTrue( self.tab_pol.IsValidState((1,3)) )
+			self.assertFalse( self.tab_pol.IsValidState((0.1,0)) ) # non integer states are invalid for TabularPolicy
+			self.assertFalse( self.tab_pol.IsValidState((3,2.3)) ) # non integer states are invalid for TabularPolicy
+
+			self.assertTrue( self.tab_pol.IsValidStateAction((1,3), 0) )
+			self.assertFalse( self.tab_pol.IsValidStateAction((1,3.3), 0) ) # non integer states are invalid for TabularPolicy
+			self.assertTrue( self.policy.IsValidStateAction((1,3.3), 0) ) # non integer states are valid for Policy
+
+			self.p_kw['value_type'] = Policy.ACTION_STATE_VALUES
+			self.tab_pol = TabularPolicy(self.ws, **self.p_kw)
+			self.assertTrue( np.all(self.tab_pol.vals.shape == np.append(self.ss, len(self.a_map)) ) )
+
+
+	unittest.main()
