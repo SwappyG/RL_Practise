@@ -15,20 +15,48 @@ from logging import critical as CRITICAL
 class Agent(object):
 
 	def __init__(self, policy, start_state, **kwargs):
-		self.policy = policy
+
+		if self.policy.IsValidState(start_state):
+			self.curr_state = start_state
+		else:
+			ERROR(f"start_state [{start_state}] was invalid")
+			raise ValueError
+
+		if not isinstance(policy, Policy):
+			ERROR(f"policy must be of type {type(Policy)}, got [{type(policy)}]")
+			raise TypeError
+
 		self.ID = kwargs.get("ID", np.random.randint(2**31-1))
 		self.is_training = kwargs.get("is_training", True)
-		self.curr_state = start_state
+
+		self.policy = policy
+		# reqs = self.policy.PacketSizeReq()
+		# self._req_S = reqs[0]
+		# self._req_A = reqs[1]
+		# self._req_R = reqs[2]
 
 	# Use our policy to get the action
 	def GetAction(self, S):
 		return self.policy.GetAction(S)
 
 	def ImprovePolicy(self, exp_packet):
-		raise NotImplementedError(f'{sys._getframe().f_code.co_name} must be implemented by derived class of class: {self.__class__.__name__}')
+
+		# Only improve policy if training flag is set
+		if self.training:
+			return self.policy.ImprovePolicy(pkt)
+			# # If exp is deep enough, grab latest slice and call ImprovePolicy
+			# if exp_packet.IsReqDepth(self._req_R, self._req_A, self._req_R):
+			# 	pkt = exp_packet.GetLatestAsPacket(self._req_S, self._req_A, self._req_R)
+
+		return False
 
 	def UpdateCurrentState(self, new_state):
-		self.curr_state = new_state
+		if self.policy.IsValidState(new_state):
+			self.curr_state = new_state
+			return True
+
+		return False
+
 
 class TabularAgent(Agent):
 
@@ -38,32 +66,6 @@ class TabularAgent(Agent):
 			raise TypeError("policy argument must be of type TabularPolicy")
 
 		Agent.__init__(self, policy, start_state, **kwargs)
-
-	def ImprovePolicy(self, exp_packet):
-
-		# Only improve policy if training flag is set
-		if self.training:
-
-			# Grab elements out of our exp_packet
-			S_list, A_list, R_list, n = exp_packet.Get()
-
-			# grab the current value of the state
-
-			V = self.policy.GetStateVal(S_list[0], A_list[0])
-
-			# Calculate the new target based on the exp_packet
-			G = self.policy.GetTargetEstimate(exp_packet)
-
-			# Increment towards the new target based on learning rate
-			new_val = (1-self.alpha) * V + self.alpha * G
-
-			# Update the value of the state and return True
-			self.policy.UpdateState(S_list[0], A_list[0], new_val)
-			return True
-
-		# Training flag not set, return false
-		else:
-			return False
 
 if __name__=="__main__":
 

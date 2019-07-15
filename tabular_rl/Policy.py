@@ -3,6 +3,13 @@
 import sys
 import numpy as np
 
+import logging
+from logging import debug as DEBUG
+from logging import info as INFO
+from logging import warn as WARN
+from logging import error as ERROR
+from logging import critical as CRITICAL
+
 class Policy(object):
 
 	STATE_VALUES = 0
@@ -12,6 +19,7 @@ class Policy(object):
 
 		self.world_space = 	world_space
 		self.gamma = 		kwargs.get("discount_factor")
+		self.alpha = 		kwargs.pop("learn_rate")
 		self.epsilon = 		kwargs.get("exploration_factor")
 		self.is_static = 	kwargs.get("is_static")
 		self.type = 		kwargs.get("value_type", Policy.STATE_VALUES)
@@ -34,6 +42,15 @@ class Policy(object):
 	def GetStateVal(self, S):
 		raise NotImplementedError(f'{sys._getframe().f_code.co_name} must be implemented by derived class of class: {self.__class__.__name__}')
 
+	def ImprovePolicy(self, packet):
+		raise NotImplementedError(f'{sys._getframe().f_code.co_name} must be implemented by derived class of class: {self.__class__.__name__}')
+
+	def PacketSizeReq(self):
+		raise NotImplementedError(f'{sys._getframe().f_code.co_name} must be implemented by derived class of class: {self.__class__.__name__}')
+
+	def IsValidPacket(self, packet):
+		raise NotImplementedError(f'{sys._getframe().f_code.co_name} must be implemented by derived class of class: {self.__class__.__name__}')
+
 	def IsValidState(self, S):
 		return self.world_space.IsValidState(S)
 
@@ -43,10 +60,12 @@ class Policy(object):
 	def IsValidStateAction(self, S ,A):
 		return self.IsValidState(S) and self.IsValidAction(A)
 
+
+
 class TabularPolicy(Policy):
 
 	def __init__(self, world_space, **kwargs):
-		self.init_var = kwargs.get("init_variance")
+		self.init_var = kwargs.pop("init_variance")
 		Policy.__init__(self, world_space, **kwargs)
 
 		if self.type == Policy.STATE_VALUES:
@@ -56,26 +75,28 @@ class TabularPolicy(Policy):
 		else:
 			raise ValueError("kwarg value_type is invalid")
 
+	# Returns true if state is valid (enforces int/long for each dim in S)
 	def IsValidState(self, S):
+
 		# Check if every element in S is a whole number
 		try:
-			if not np.all( [isinstance(s, (int,long)) for s in S ] ):
-				return False
+			if isinstance(S, (int,long)) or \
+				np.all( [isinstance(s, (int,long)) for s in S ] ):
+				# Let the world_space determine validity if we have all ints/longs
+				return self.world_space.IsValidState(S)
 
-		# Catch TypeError incase S is not a list (single dimension)
 		except TypeError:
-			pass
+			WARN(f"Dimensions or type of S {S} are incorrect, got TypeError")
 
-		# Let the world_space determine validity if we have all ints/longs
-		return self.world_space.IsValidState(S)
+		return False
 
+	# Returns the value of the specified indices
 	def GetStateVal(self, indices):
 		return self.vals[tuple(indices)]
 
+	# Updates the value at specified indices with val given
 	def UpdateStateVal(self, indices, val):
-		# print self.vals[tuple(indices)]
 		self.vals[tuple(indices)] = val
-		# print self.vals
 
 
 if __name__=="__main__":
@@ -151,9 +172,21 @@ if __name__=="__main__":
 
 		def test_NotImplementedGetTargetEstimate(self):
 			with self.assertRaises(NotImplementedError):
-				self.policy.GetTargetEstimate( ExpPacket([], [], [], 1) )
+				self.policy.GetTargetEstimate( ExpPacket([], [], []) )
 			with self.assertRaises(NotImplementedError):
-				self.policy.GetTargetEstimate( ExpPacket([(0,0),(3,1),(8,1)], [0,2,1], [-1,-1,0], 1) )
+				self.policy.GetTargetEstimate( ExpPacket([(0,0),(3,1),(8,1)], [0,2,1], [-1,-1,0]) )
+
+		def test_NotImplementedImprovePolicy(self):
+			with self.assertRaises(NotImplementedError):
+				self.policy.ImprovePolicy( ExpPacket([], [], []) )
+
+		def test_NotImplementedIsValidPacket(self):
+			with self.assertRaises(NotImplementedError):
+				self.policy.IsValidPacket( ExpPacket([], [], []) )
+
+		def test_NotImplementedPacketSizeReq(self):
+			with self.assertRaises(NotImplementedError):
+				self.policy.PacketSizeReq()
 
 		# Test that the TabularPolicy enforces discrete states and creates a value matrix for the state_space
 		def test_TabularPolicy(self):
@@ -166,6 +199,8 @@ if __name__=="__main__":
 			self.assertTrue( self.tab_pol.IsValidState((1,3)) )
 			self.assertFalse( self.tab_pol.IsValidState((0.1,0)) ) # non integer states are invalid for TabularPolicy
 			self.assertFalse( self.tab_pol.IsValidState((3,2.3)) ) # non integer states are invalid for TabularPolicy
+			self.assertFalse( self.tab_pol.IsValidState(2.3) ) # Make sure there's no index error
+			self.assertFalse( self.tab_pol.IsValidState('a') ) # Make sure there's no index error or type error
 
 			self.assertTrue( self.tab_pol.IsValidStateAction((1,3), 0) )
 			self.assertFalse( self.tab_pol.IsValidStateAction((1,3.3), 0) ) # non integer states are invalid for TabularPolicy
