@@ -1,14 +1,15 @@
 # -*- coding: future_fstrings -*-
-import sys
-import numpy as np
 import copy
-
 import logging
+import sys
+from logging import critical as CRITICAL
 from logging import debug as DEBUG
+from logging import error as ERROR
 from logging import info as INFO
 from logging import warn as WARN
-from logging import error as ERROR
-from logging import critical as CRITICAL
+
+import numpy as np
+
 
 def PadList(list_to_pad, req_length, padding_token):
     diff = req_length - len(list_to_pad)
@@ -21,3 +22,12 @@ def PadList(list_to_pad, req_length, padding_token):
         new_list.append(padding_token)
 
     return new_list
+
+def ToTuple(input_list):
+    # Try to convert lists, ndarrays, etc to tuple
+    try:
+        return tuple(input_list)
+
+    # If we get type error, just return the val without conversion
+    except TypeError:
+        return input_list

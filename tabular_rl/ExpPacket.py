@@ -9,7 +9,7 @@ from logging import warn as WARN
 from logging import error as ERROR
 from logging import critical as CRITICAL
 
-from TabularRLUtils import PadList
+from TabularRLUtils import PadList, ToTuple
 
 class ExpPacket(object):
 
@@ -53,6 +53,9 @@ class ExpPacket(object):
 			ret_str = ret_str + f"{triplet}\n"
 		
 		return ret_str
+
+	def __len__(self):
+		return max([self.LenS(), self.LenA(), self.LenR()])
 
 	def Get(self):
 		"""Returns list of S, A and R"""
@@ -106,9 +109,9 @@ class ExpPacket(object):
 			self.LenR() >= ExpPacket.MAX_SIZE:
 			return False
 
-		self._S_list.append(self._ToTuple(S))
-		self._A_list.append(self._ToTuple(A))
-		self._R_list.append(self._ToTuple(R))
+		self._S_list.append(ToTuple(S))
+		self._A_list.append(ToTuple(A))
+		self._R_list.append(ToTuple(R))
 
 		return True
 
@@ -129,15 +132,6 @@ class ExpPacket(object):
 	def LenR(self):
 		"""Returns the current length of the list R"""
 		return len(self._R_list)
-
-	def _ToTuple(self, val):
-		# Try to convert lists, ndarrays, etc to tuple
-		try:
-			return tuple(val)
-
-		# If we get type error, just return the val without conversion
-		except TypeError:
-			return val
 
 if __name__=="__main__":
 

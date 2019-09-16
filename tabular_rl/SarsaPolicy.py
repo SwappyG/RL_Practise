@@ -12,7 +12,9 @@ from logging import warn as WARN
 from logging import error as ERROR
 from logging import critical as CRITICAL
 
-logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+from TabularRLUtils import ToTuple
+
+logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
 
 class SarsaPolicy(TabularPolicy):
 
@@ -35,16 +37,22 @@ class SarsaPolicy(TabularPolicy):
 		TabularPolicy.__init__(self, world, **params)
 		DEBUG("Initialized SarsaPolicy instance")
 
+		DEBUG(f"Shape of VALS {self.vals.shape}")
+
 	# Returns a selection of equally valid actions
 	def _GetActions(self, S, eps=1):
+
+		DEBUG(f"Getting actions for state {S}")
 
 		# occasionally select a random action
 		if (np.random.rand() > eps):
 			selection = range(self._num_a)
+			DEBUG(f"Got selection {selection}")
 
 		# get a set of actions tied for the max value for this state
 		else:
-			vals = self.vals[S]
+			vals = self.vals[ToTuple(S)]
+			DEBUG(f"Got Vals {vals}")
 			selection = [index for index, val in enumerate(vals) if val == np.max(vals)]
 
 		return selection
@@ -84,7 +92,9 @@ class SarsaPolicy(TabularPolicy):
 
 	# Wrapper around TabularPolicy.UpdateState, taking S, A as seperate args
 	def UpdateState(self, S, A, val):
+		DEBUG(f"Updating State")
 		if self.IsValidStateAction(S, A):
+			DEBUG(f"State action is valid, calling UpdateStateVal")
 			super(type(self), self).UpdateStateVal( np.append(S,A), val )
 			return True
 		else:
@@ -103,7 +113,9 @@ class SarsaPolicy(TabularPolicy):
 		return packet.IsReqDepth(self._req_R, self._req_A, self._req_R)
 
 	def ImprovePolicy(self, packet):
+		DEBUG(f"Called improve policy")
 		if not self.IsValidPacket(packet):
+			DEBUG(f"Packet is too small")
 			return False
 
 		S_list, A_list, R_list = packet.Get() # Grab elements out of our exp_packet
