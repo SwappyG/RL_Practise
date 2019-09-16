@@ -1,6 +1,13 @@
 # -*- coding: future_fstrings -*-
 import numpy as np
 
+import logging
+from logging import debug as DEBUG
+from logging import info as INFO
+from logging import warn as WARN
+from logging import error as ERROR
+from logging import critical as CRITICAL
+
 """
 Holds the state space and action space for a "world"
 State space is an np array of size n, with each number i repr max value of dim i
@@ -19,11 +26,21 @@ class WorldSpace(object):
         self._final_state = np.array( [coord-1 for coord in self._S] )
         self._num_dims = len(self._S)
 
-        for k, v in self._action_map.items():
+        for _, v in self._action_map.items():
             if not len(v) == self._num_dims:
                 raise ValueError(f"Each action in action_map must have same dims as state_space. Action {v} does not.")
 
     def IsValidState(self, S):
+
+        # Handle non list S
+        if isinstance(S, (int,long)) and self.StateDims != 1:
+            return False
+
+        # Make sure dims of S make sense
+        if (self.StateDims() != len(S)):
+            return False
+        
+        # Make sure the values of S are within bounds
         return np.all(np.array(S) < self._S) and np.all(np.array(S) >= self._zero_state)
 
     def IsValidAction(self, A):
@@ -83,7 +100,7 @@ if __name__=="__main__":
 
         def test_Init(self):
             try:
-                scrap_ws = WorldSpace((3,4,5), self.a_map)
+                _ = WorldSpace((3,4,5), self.a_map)
             except ValueError:
                 pass
             except:
@@ -108,8 +125,11 @@ if __name__=="__main__":
             self.assertFalse(self.ws.IsValidState((0,-1)), 'IsValidState failed')
             self.assertFalse(self.ws.IsValidState((-1,0)), 'IsValidState failed')
             self.assertFalse(self.ws.IsValidState((9,1,)), 'IsValidState failed')
-            with self.assertRaises(ValueError):
-                self.ws.IsValidState((4,7,5))
+            self.assertFalse(self.ws.IsValidState(5), 'IsValidState failed')
+            self.assertFalse(self.ws.IsValidState((4,7,5)), 'IsValidState failed')
+            self.assertTrue(self.ws.IsValidState((0,0)), 'IsValidState failed')
+            self.assertTrue(self.ws.IsValidState((8,6)), 'IsValidState failed')
+            self.assertTrue(self.ws.IsValidState((4,4)), 'IsValidState failed')
 
         # Check IsValidAction, make sure its a singleton and TypeError is raised otherwise
         def test_IsValidAction(self):

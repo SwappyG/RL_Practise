@@ -32,7 +32,7 @@ if __name__=="__main__":
 
         def setUp(self):
 
-            self.ss = (6,7,9)
+            self.ss = (6,7)
 
             # Insert elements in order to keep track
             self.a_map = OrderedDict()

@@ -1,7 +1,8 @@
 # -*- coding: future_fstrings -*-
 import sys
 import numpy as np
-from Policy import Policy, TabularPolicy
+from Policy import Policy
+from TabularPolicy import TabularPolicy
 from ExpPacket import ExpPacket
 
 import logging
@@ -102,17 +103,16 @@ class SarsaPolicy(TabularPolicy):
 		return packet.IsReqDepth(self._req_R, self._req_A, self._req_R)
 
 	def ImprovePolicy(self, packet):
-		if not IsValidPacket(packet):
+		if not self.IsValidPacket(packet):
 			return False
 
-		S_list, A_list, R_list, n = exp_packet.Get() # Grab elements out of our exp_packet
+		S_list, A_list, R_list = packet.Get() # Grab elements out of our exp_packet
 
 		V = self.GetStateVal(S_list[0], A_list[0]) # grab the current value of the state
-		G = self.GetTargetEstimate(exp_packet) # Calculate the new target based on the exp_packet
+		G = self.GetTargetEstimate(packet) # Calculate the new target based on the exp_packet
 		new_val = (1-self.alpha) * V + self.alpha * G # Increment towards the new target based on learning rate
 
 		self.UpdateState(S_list[0], A_list[0], new_val) # Update the value of the state and return True
-
 		return True
 
 
@@ -147,12 +147,12 @@ if __name__=="__main__":
 		def test_UpdateStateGetState(self):
 			self.assertTrue(self.policy.UpdateState( (0,0), 0, 42)) # Check that we can update
 			self.assertAlmostEqual(self.policy.vals[(0,0,0)], 42) # Check that it updates correctly
-			self.assertAlmostEqual(self.policy.GetStateValue( (0,0), 0 ), 42) # Make sure we can get value back properly
-			self.assertNotEqual(self.policy.GetStateValue( (0,0), 1 ), 42) # Make sure neighbouring states didn't update
-			self.assertNotEqual(self.policy.GetStateValue( (0,1), 0 ), 42) # Make sure neighbouring states didn't update
-			self.assertNotEqual(self.policy.GetStateValue( (1,0), 0 ), 42) # Make sure neighbouring states didn't update
-			self.assertNotEqual(self.policy.GetStateValue( (1,1), 0 ), 42) # Make sure neighbouring states didn't update
-			self.assertNotEqual(self.policy.GetStateValue( (1,1), 1 ), 42) # Make sure neighbouring states didn't update
+			self.assertAlmostEqual(self.policy.GetStateVal( (0,0), 0 ), 42) # Make sure we can get value back properly
+			self.assertNotEqual(self.policy.GetStateVal( (0,0), 1 ), 42) # Make sure neighbouring states didn't update
+			self.assertNotEqual(self.policy.GetStateVal( (0,1), 0 ), 42) # Make sure neighbouring states didn't update
+			self.assertNotEqual(self.policy.GetStateVal( (1,0), 0 ), 42) # Make sure neighbouring states didn't update
+			self.assertNotEqual(self.policy.GetStateVal( (1,1), 0 ), 42) # Make sure neighbouring states didn't update
+			self.assertNotEqual(self.policy.GetStateVal( (1,1), 1 ), 42) # Make sure neighbouring states didn't update
 
 			self.assertFalse(self.policy.UpdateState( (0,-1), 0, 32)) # Check that it rejects bad (S,A)
 			self.assertFalse(self.policy.UpdateState( (0,1), 8, 22)) # Check that it rejects bad (S,A)
@@ -224,7 +224,7 @@ if __name__=="__main__":
 			self.assertAlmostEqual( self.policy.GetProbabilityOfAction((0,0), 3), (1-eps)/4)
 
 		def test_Packets(self):
-			self.assertTrue( (self._req_S, self._req_A, self._req_R) == self.policy.PacketSizeReq() )
+			self.assertTrue( (self.policy._req_S, self.policy._req_A, self.policy._req_R) == self.policy.PacketSizeReq() )
 
 			pkt = ExpPacket([],[],[])
 			self.assertFalse(self.policy.IsValidPacket(pkt)) # depth of 0, not good enough
@@ -238,8 +238,8 @@ if __name__=="__main__":
 		def test_ImprovePolicy(self):
 			pkt = ExpPacket([],[],[])
 
-			old_val = self.policy.GetStateValue((0,0), 0)
-			val_1_1_2 = self.policy.GetStateValue((1,1), 2)
+			old_val = self.policy.GetStateVal((0,0), 0)
+			val_1_1_2 = self.policy.GetStateVal((1,1), 2)
 			alpha = self.policy.alpha
 			gamma = self.policy.gamma
 
@@ -250,7 +250,7 @@ if __name__=="__main__":
 			pkt.Push( (1,1), 2, -1 )
 			self.assertTrue(self.policy.ImprovePolicy(pkt)) # Depth of 1, not good enough
 
-			new_val = self.policy.GetStateValue((0,0), 0)
+			new_val = self.policy.GetStateVal((0,0), 0)
 			self.assertNotEqual(old_val, new_val) # Make sure (0,0), 0 got updated
 			self.assertAlmostEqual(new_val, (1-alpha)*old_val + alpha*(-1 + gamma*val_1_1_2) ) # make sure it follows the SARSA update
 

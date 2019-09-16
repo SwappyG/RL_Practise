@@ -108,10 +108,6 @@ if __name__=="__main__":
 
     class TestDynamicNDWorldInit(unittest.TestCase):
 
-        ARR = lambda x: np.array(x)
-        ALL = lambda x: np.all(x)
-        ACT = lambda x: self.ws.ActionVal(index=x)
-
         def setUp(self):
 
             # Insert elements in order to keep track
@@ -137,12 +133,14 @@ if __name__=="__main__":
             del self.ws
             del self.world
 
+        # define a hazard func for testing
         def hazard_func(self, S):
             if S[0] % 2:
                 return True
             else:
                 return False
 
+        # define a dynamics func for testing
         def dynamics_func(self, S):
             if S[0] % 2:
                 return (1,0)
@@ -150,7 +148,6 @@ if __name__=="__main__":
                 return (0,0)
 
         def test_Initialization(self):
-            ARR, ALL, ACT = self.ARR, self.ALL, self.ACT
 
             bad_kw = {'start_state':(-1, 2), 'goal_state':(8,3)}
             with self.assertRaises(ValueError):
@@ -161,10 +158,10 @@ if __name__=="__main__":
                 DynamicNDWorld(self.ws, **bad_kw)
 
             large_ws = WorldSpace((934,36,52,343), {"U":(0,0,0,1)})
-            scrap_world = DynamicNDWorld(large_ws)
+            DynamicNDWorld(large_ws)
 
             try:
-                scrap_world = DynamicNDWorld(large_ws, **self.w_kw)
+                DynamicNDWorld(large_ws, **self.w_kw)
             except ValueError:
                 pass
             except:
@@ -181,7 +178,7 @@ if __name__=="__main__":
             self.assertFalse( ALL( self.world.GetNextState( ARR((7,5)), 0) == self.world.start_state ) )
 
         def test_NextState_InvalidStates(self):
-            ARR, ALL, ACT = self.ARR, self.ALL, self.ACT
+            ARR, ALL, _ = self.ARR, self.ALL, self.ACT
 
             with self.assertRaises(ValueError):
                 ALL( self.world.GetNextState( ARR((-4,5)), 0) )
@@ -191,7 +188,7 @@ if __name__=="__main__":
                 ALL( self.world.GetNextState( ARR((9,9)), 0) )
 
         def test_NextState_InvalidActions(self):
-            ARR, ALL, ACT = self.ARR, self.ALL, self.ACT
+            ARR, ALL, _ = self.ARR, self.ALL, self.ACT
 
             with self.assertRaises(ValueError):
                 ALL( self.world.GetNextState( ARR((3,4)), 5) )
@@ -207,7 +204,7 @@ if __name__=="__main__":
             self.assertTrue( ALL( self.world.GetNextState( ARR((2,1)), 0) == self.world.start_state ) )
 
         def test_NextState_RewardCheck(self):
-            ARR, ALL, ACT = self.ARR, self.ALL, self.ACT
+            ARR, _, _ = self.ARR, self.ALL, self.ACT
 
             self.world.hazard_func = self.hazard_func
 
@@ -236,7 +233,7 @@ if __name__=="__main__":
             self.assertTrue( self.world.hit_hazard )
 
         def test_GetReward(self):
-            ARR, ALL, ACT = self.ARR, self.ALL, self.ACT
+            ARR, _, _ = self.ARR, self.ALL, self.ACT
 
             S = self.world.GetNextState( ARR((3,4)), 0)
             self.assertTrue( self.world.GetReward(S) == DynamicNDWorld.NORMAL_REWARD )
